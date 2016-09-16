@@ -49,6 +49,8 @@ int margin = 1;
 int thresG = 120;
 int thresL = 120;
 int ExpRange = 90;
+signed int CV2InputG = 0;
+signed int CV2InputL = 0;
 
 // Variables 
 int ledStateONOFF = HIGH; // the current state of the output pin
@@ -111,8 +113,8 @@ void setup() {
     thresL = 130;
   }
   if (ExpRange == 0 || ExpRange == 255) {
-    EEPROM.write(4, 70);
-    ExpRange = 70;
+    EEPROM.write(4, 25);
+    ExpRange = 25;
   }
   Serial.println("Grombass v2 20160916 HW 2.3");
   //Change PWM speed:
@@ -182,19 +184,22 @@ void loop() {
 
   if (EXPon == 0) { //Expression pedal is active
     CV2Input = analogRead(CV2); //read exp pedal input
-    int ExpThresholdG = map(thresG, 0,255,0,(255-ExpRange));
-    int ExpThresholdL = map(thresL, 0,255,0,(255-ExpRange));   
-    int CV2InputG = map(CV2Input, 0, 1023, 0, (4*((255-ExpRange)-ExpThresholdG))); 
-    int CV2InputL = map(CV2Input, 0, 1023, 0, (1.5*((255-ExpRange)-ExpThresholdL))); 
+    int ExpThresholdG = thresG/2;
+    int ExpThresholdL = thresL/2;   
+    int usedRange = ExpRange*((255-ExpThresholdG)/2)*0.01;
+    Serial.println(usedRange);
+    CV2InputG = map(CV2Input, 0, 1023, 0, 2*usedRange); 
+    CV2InputL = map(CV2Input, 0, 1023, 0, 2*usedRange);
      
     if (ledStateBOOST) { //boost active
-      int PWMGainBoost = map(CV1Input, 0, 1024, 0, ExpRange); //A0 mapped to 0-45 dependent of the A0 input value
-      PWMGain = ExpThresholdG - CV2InputG - PWMGainBoost;
-      PWMLevel = ExpThresholdL + CV2InputL - PWMGainBoost;
+      int PWMGainBoost = map(CV1Input, 0, 1024, 0, ExpThresholdG);
+      int PWMLevelBoost = map(CV1Input, 0, 1024, 0, ExpThresholdL);      
+      PWMGain = ExpThresholdG + usedRange - CV2InputG-PWMGainBoost;
+      PWMLevel = ExpThresholdL + usedRange + CV2InputL-PWMLevelBoost; 
     } 
     else {
-      PWMGain = ExpThresholdG - CV2InputG;
-      PWMLevel = ExpThresholdL + CV2InputL; //scale to usable area
+      PWMGain = ExpThresholdG + usedRange - CV2InputG;
+      PWMLevel = ExpThresholdL + usedRange + CV2InputL; 
     }
     PWMLED = (255 - PWMLevel)*0.5;
   }
@@ -252,7 +257,7 @@ void loop() {
     if (Tap1Timer > 300) {
       temp = !temp;
       ExpRange = analogRead(CV1);
-      ExpRange = map(ExpRange, 0, 1023, 255, 0);
+      ExpRange = map(ExpRange, 0, 1023, 100, 0);
       delay(5000);
       analogWrite(DIO1, temp * 255);
       analogWrite(DIO2, temp * 255);
@@ -304,7 +309,7 @@ void loop() {
   Serial.print(" thresL: ");
   Serial.print(thresL);
   Serial.print(" CV2Input: ");
-  Serial.print(CV2Input);
+  Serial.print(CV2InputG);
   Serial.print(" ONOFF: ");
   Serial.print(ledStateONOFF);
   Serial.print(" BOOST: ");
